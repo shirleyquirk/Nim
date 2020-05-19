@@ -592,6 +592,22 @@ when defined(posix) and not defined(nimscript):
 
   proc c_fstat(a1: cint, a2: var Stat): cint {.
     importc: "fstat", header: "<sys/stat.h>".}
+elif defined(freertos):
+
+  type
+    Mode {.importc: "mode_t", header: "<esp_vfs.h>".} = cint
+
+    # fillers ensure correct size & offsets
+    Stat {.importc: "struct stat",
+            header: "<esp_vfs.h>", final, pure.} = object ## struct stat
+      st_mode: Mode        ## Mode of file
+
+  proc modeIsDir(m: Mode): bool =
+    ## Test for a directory.
+    (m and 0o170000) == 0o40000
+
+  proc c_fstat(a1: cint, a2: var Stat): cint {.
+    importc: "fstat", header: "<sys/stat.h>".}
 
 
 proc open*(f: var File, filename: string,
@@ -713,7 +729,8 @@ when declared(stdout):
       android_log_print(ANDROID_LOG_VERBOSE, "nim", s)
     else:
       # flockfile deadlocks some versions of Android 5.x.x
-      when not defined(windows) and not defined(android) and not defined(nintendoswitch) and hostOS != "any":
+      when not defined(windows) and not defined(android) and
+            not defined(nintendoswitch) and not defined(oslite) and hostOS != "any":
         proc flockfile(f: File) {.importc, nodecl.}
         proc funlockfile(f: File) {.importc, nodecl.}
         flockfile(stdout)
@@ -727,7 +744,8 @@ when declared(stdout):
       const linefeed = "\n"
       discard c_fwrite(linefeed.cstring, linefeed.len, 1, stdout)
       discard c_fflush(stdout)
-      when not defined(windows) and not defined(android) and not defined(nintendoswitch) and hostOS != "any":
+      when not defined(windows) and not defined(android) and
+            not defined(nintendoswitch) and not defined(oslite) and hostOS != "any":
         funlockfile(stdout)
       when defined(windows) and compileOption("threads"):
         releaseSys echoLock

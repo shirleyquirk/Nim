@@ -28,6 +28,8 @@ import asyncdispatch, os
 
 when defined(windows) or defined(nimdoc):
   import winlean
+elif defined(oslite):
+  {.error: "not implemented on Lite OS'es!".}
 else:
   import posix
 

@@ -166,7 +166,8 @@
 ##
 ## * The effect system (``raises: []``) does not work with async procedures.
 
-import os, tables, strutils, times, heapqueue, options, asyncstreams
+import os
+import tables, strutils, times, heapqueue, options, asyncstreams
 import options, math, std/monotimes
 import asyncfutures except callSoon
 
@@ -1088,8 +1089,12 @@ when defined(windows) or defined(nimdoc):
   initAll()
 else:
   import selectors
-  from posix import EINTR, EAGAIN, EINPROGRESS, EWOULDBLOCK, MSG_PEEK,
-                    MSG_NOSIGNAL
+  when defined(freertos):
+    from freertos import EINTR, EAGAIN, EINPROGRESS, EWOULDBLOCK, MSG_PEEK,
+                      MSG_NOSIGNAL
+  else:
+    from posix import EINTR, EAGAIN, EINPROGRESS, EWOULDBLOCK, MSG_PEEK,
+                      MSG_NOSIGNAL
   const
     InitCallbackListSize = 4         # initial size of callbacks sequence,
                                      # associated with file/socket descriptor.
@@ -1545,17 +1550,18 @@ else:
       data.readList.add(cb)
       p.selector.registerProcess(pid, data)
 
-  proc newAsyncEvent*(): AsyncEvent =
-    ## Creates new ``AsyncEvent``.
-    result = AsyncEvent(newSelectEvent())
+  when not defined(oslite):
+    proc newAsyncEvent*(): AsyncEvent =
+      ## Creates new ``AsyncEvent``.
+      result = AsyncEvent(newSelectEvent())
 
-  proc trigger*(ev: AsyncEvent) =
-    ## Sets new ``AsyncEvent`` to signaled state.
-    trigger(SelectEvent(ev))
+    proc trigger*(ev: AsyncEvent) =
+      ## Sets new ``AsyncEvent`` to signaled state.
+      trigger(SelectEvent(ev))
 
-  proc close*(ev: AsyncEvent) =
-    ## Closes ``AsyncEvent``
-    close(SelectEvent(ev))
+    proc close*(ev: AsyncEvent) =
+      ## Closes ``AsyncEvent``
+      close(SelectEvent(ev))
 
   proc addEvent*(ev: AsyncEvent, cb: Callback) =
     ## Start watching for event ``ev``, and call callback ``cb``, when

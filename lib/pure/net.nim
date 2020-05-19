@@ -64,15 +64,17 @@
 ##     socket.acceptAddr(client, address)
 ##     echo("Client connected from: ", address)
 
+const useWinVersion = defined(Windows) or defined(nimdoc)
+const defineSsl = defined(ssl) or defined(nimdoc)
+
 import std/private/since
 
 import nativesockets, os, strutils, times, sets, options, std/monotimes
-from ssl_certs import scanSSLCertificates
+
+when defineSsl:
+  from ssl_certs import scanSSLCertificates
 export nativesockets.Port, nativesockets.`$`, nativesockets.`==`
 export Domain, SockType, Protocol
-
-const useWinVersion = defined(Windows) or defined(nimdoc)
-const defineSsl = defined(ssl) or defined(nimdoc)
 
 when defineSsl:
   import openssl
@@ -1027,6 +1029,8 @@ proc close*(socket: Socket) =
 
 when defined(posix):
   from posix import TCP_NODELAY
+elif defined(freertos):
+  from freertos import TCP_NODELAY
 else:
   from winlean import TCP_NODELAY
 

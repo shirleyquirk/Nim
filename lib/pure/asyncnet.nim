@@ -96,7 +96,8 @@
 ##
 
 import std/private/since
-import asyncdispatch, nativesockets, net, os
+import asyncdispatch, nativesockets, net
+import os
 
 export SOBool
 
