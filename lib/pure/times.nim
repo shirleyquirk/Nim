@@ -221,6 +221,15 @@ when defined(js):
     system.inc(a, b)
   {.pop.}
 
+elif defined(freertos):
+  import freertos as posix
+
+  type CTime = posix.Time
+
+  when defined(macosx):
+    proc gettimeofday(tp: var Timeval, unused: pointer = nil)
+      {.importc: "gettimeofday", header: "<sys/time.h>", sideEffect.}
+
 elif defined(posix):
   import posix
 
@@ -2578,6 +2587,11 @@ proc epochTime*(): float {.tags: [TimeEffect].} =
     result = toBiggestFloat(a.tv_sec.int64) + toBiggestFloat(
         a.tv_usec)*0.00_0001
   elif defined(posix):
+    var ts: Timespec
+    discard clock_gettime(CLOCK_REALTIME, ts)
+    result = toBiggestFloat(ts.tv_sec.int64) +
+      toBiggestFloat(ts.tv_nsec.int64) / 1_000_000_000
+  elif defined(freertos):
     var ts: Timespec
     discard clock_gettime(CLOCK_REALTIME, ts)
     result = toBiggestFloat(ts.tv_sec.int64) +

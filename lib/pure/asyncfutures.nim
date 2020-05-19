@@ -7,7 +7,8 @@
 #    distribution, for details about the copyright.
 #
 
-import os, tables, strutils, times, heapqueue, options, deques, cstrutils
+import os
+import tables, strutils, times, heapqueue, options, deques, cstrutils
 
 # TODO: This shouldn't need to be included, but should ideally be exported.
 type
