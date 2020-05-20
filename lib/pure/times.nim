@@ -2587,16 +2587,11 @@ when not defined(js):
       gettimeofday(a)
       result = toBiggestFloat(a.tv_sec.int64) + toBiggestFloat(
           a.tv_usec)*0.00_0001
-    elif defined(posix):
+    elif defined(posix) or defined(freertos):
       var ts: Timespec
       discard clock_gettime(CLOCK_REALTIME, ts)
       result = toBiggestFloat(ts.tv_sec.int64) +
         toBiggestFloat(ts.tv_nsec.int64) / 1_000_000_000
-  elif defined(freertos):
-    var ts: Timespec
-    discard clock_gettime(CLOCK_REALTIME, ts)
-    result = toBiggestFloat(ts.tv_sec.int64) +
-      toBiggestFloat(ts.tv_nsec.int64) / 1_000_000_000
     elif defined(windows):
       var f: winlean.FILETIME
       getSystemTimeAsFileTime(f)
