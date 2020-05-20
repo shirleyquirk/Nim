@@ -46,6 +46,7 @@ proc getEnv*(key: string, default = ""): TaintedString =
   ## * `envPairs iterator <#envPairs.i>`_
   return customEnvs.getOrDefault(key, default)
 
+<<<<<<< HEAD
 proc paramStr*(i: int): string =
   ## Retrieves the ``i``'th command line parameter.
   discard
@@ -53,4 +54,6 @@ proc paramStr*(i: int): string =
 proc paramCount*(): int =
   ## Retrieves the number of command line parameters.
   discard
+=======
+>>>>>>> ba3af07020e99d275be357c7cd0883f05a3e81ae
 
