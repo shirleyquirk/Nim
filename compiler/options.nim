@@ -7,8 +7,10 @@
 #    distribution, for details about the copyright.
 #
 
-import
-  os, strutils, strtabs, sets, lineinfos, platform,
+when not defined(oslite):
+  import os
+
+import strutils, strtabs, sets, lineinfos, platform,
   prefixmatches, pathutils
 
 from terminal import isatty
@@ -463,6 +465,10 @@ proc isDefined*(conf: ConfigRef; symbol: string): bool =
     of "sunos": result = conf.target.targetOS == osSolaris
     of "nintendoswitch":
       result = conf.target.targetOS == osNintendoSwitch
+    of "freertos":
+      result = conf.target.targetOS == osFreeRTOS
+    of "oslite":
+      result = conf.target.targetOS in {osFreeRTOS}
     of "littleendian": result = CPU[conf.target.targetCPU].endian == platform.littleEndian
     of "bigendian": result = CPU[conf.target.targetCPU].endian == platform.bigEndian
     of "cpu8": result = CPU[conf.target.targetCPU].bit == 8

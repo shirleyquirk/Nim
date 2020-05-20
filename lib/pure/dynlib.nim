@@ -150,6 +150,28 @@ elif defined(nintendoswitch):
   proc symAddr(lib: LibHandle, name: cstring): pointer =
     raise newException(OSError, "symAddr not implemented on Nintendo Switch!")
 
+elif defined(oslite):
+  #
+  # =========================================================================
+  # Nintendo switch DevkitPro sdk does not have these. Raise an error if called.
+  # =========================================================================
+  #
+
+  proc dlclose(lib: LibHandle) =
+    raise newException(OSError, "dlclose not implemented for Lite OS'es!")
+  proc dlopen(path: cstring, mode: int): LibHandle =
+    raise newException(OSError, "dlopen not implemented for Lite OS'es!")
+  proc dlsym(lib: LibHandle, name: cstring): pointer =
+    raise newException(OSError, "dlsym not implemented for Lite OS'es!")
+  proc loadLib(path: string, global_symbols = false): LibHandle =
+    raise newException(OSError, "loadLib not implemented for Lite OS'es!")
+  proc loadLib(): LibHandle =
+    raise newException(OSError, "loadLib not implemented for Lite OS'es!")
+  proc unloadLib(lib: LibHandle) =
+    raise newException(OSError, "unloadLib not implemented for Lite OS'es!")
+  proc symAddr(lib: LibHandle, name: cstring): pointer =
+    raise newException(OSError, "symAddr not implemented for Lite OS'es!")
+
 elif defined(windows) or defined(dos):
   #
   # =======================================================================

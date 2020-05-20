@@ -4,6 +4,7 @@
 #        (c) Copyright 2015 Dominik Picheta
 #
 #    See the file "copying.txt", included in this
+
 #    distribution, for details about the copyright.
 #
 
@@ -12,7 +13,8 @@
 
 # TODO: Clean up the exports a bit and everything else in general.
 
-import os, options
+import os
+import options
 
 when hostOS == "solaris":
   {.passl: "-lsocket -lnsl".}
@@ -25,7 +27,14 @@ when useWinVersion:
          WSANOTINITIALISED, WSAENOTSOCK, WSAEINPROGRESS, WSAEINTR,
          WSAEDISCON, ERROR_NETNAME_DELETED
 else:
-  import posix
+  when defined(freertos):
+    # resue most of the posix names
+    static:
+      echo "Compiling nativesockets using FreeRTOS"
+
+    import freertos/posix as posix
+  else:
+    import posix
   export fcntl, F_GETFL, O_NONBLOCK, F_SETFL, EAGAIN, EWOULDBLOCK, MSG_NOSIGNAL,
     EINTR, EINPROGRESS, ECONNRESET, EPIPE, ENETRESET, EBADF
   export Sockaddr_storage, Sockaddr_un, Sockaddr_un_path_length
@@ -260,7 +269,7 @@ proc getAddrInfo*(address: string, port: Port, domain: Domain = AF_INET,
   let socketPort = if sockType == SOCK_RAW: "" else: $port
   var gaiResult = getaddrinfo(address, socketPort, addr(hints), result)
   if gaiResult != 0'i32:
-    when useWinVersion:
+    when useWinVersion or defined(freertos):
       raiseOSError(osLastError())
     else:
       raiseOSError(osLastError(), $gai_strerror(gaiResult))
@@ -294,79 +303,80 @@ template htons*(x: uint16): untyped =
   ## order, this is a no-op; otherwise, it performs a 2-byte swap operation.
   nativesockets.ntohs(x)
 
-proc getServByName*(name, proto: string): Servent {.tags: [ReadIOEffect].} =
-  ## Searches the database from the beginning and finds the first entry for
-  ## which the service name specified by ``name`` matches the s_name member
-  ## and the protocol name specified by ``proto`` matches the s_proto member.
-  ##
-  ## On posix this will search through the ``/etc/services`` file.
-  when useWinVersion:
-    var s = winlean.getservbyname(name, proto)
-  else:
-    var s = posix.getservbyname(name, proto)
-  if s == nil: raiseOSError(osLastError(), "Service not found.")
-  result.name = $s.s_name
-  result.aliases = cstringArrayToSeq(s.s_aliases)
-  result.port = Port(s.s_port)
-  result.proto = $s.s_proto
-
-proc getServByPort*(port: Port, proto: string): Servent {.tags: [ReadIOEffect].} =
-  ## Searches the database from the beginning and finds the first entry for
-  ## which the port specified by ``port`` matches the s_port member and the
-  ## protocol name specified by ``proto`` matches the s_proto member.
-  ##
-  ## On posix this will search through the ``/etc/services`` file.
-  when useWinVersion:
-    var s = winlean.getservbyport(ze(int16(port)).cint, proto)
-  else:
-    var s = posix.getservbyport(ze(int16(port)).cint, proto)
-  if s == nil: raiseOSError(osLastError(), "Service not found.")
-  result.name = $s.s_name
-  result.aliases = cstringArrayToSeq(s.s_aliases)
-  result.port = Port(s.s_port)
-  result.proto = $s.s_proto
-
-proc getHostByAddr*(ip: string): Hostent {.tags: [ReadIOEffect].} =
-  ## This function will lookup the hostname of an IP Address.
-  var myaddr: InAddr
-  myaddr.s_addr = inet_addr(ip)
-
-  when useWinVersion:
-    var s = winlean.gethostbyaddr(addr(myaddr), sizeof(myaddr).cuint,
-                                  cint(AF_INET))
-    if s == nil: raiseOSError(osLastError())
-  else:
-    var s =
-      when defined(android4):
-        posix.gethostbyaddr(cast[cstring](addr(myaddr)), sizeof(myaddr).cint,
-                            cint(posix.AF_INET))
-      else:
-        posix.gethostbyaddr(addr(myaddr), sizeof(myaddr).SockLen,
-                            cint(posix.AF_INET))
-    if s == nil:
-      raiseOSError(osLastError(), $hstrerror(h_errno))
-
-  result.name = $s.h_name
-  result.aliases = cstringArrayToSeq(s.h_aliases)
-  when useWinVersion:
-    result.addrtype = Domain(s.h_addrtype)
-  else:
-    if s.h_addrtype == posix.AF_INET:
-      result.addrtype = AF_INET
-    elif s.h_addrtype == posix.AF_INET6:
-      result.addrtype = AF_INET6
+when not defined(oslite):
+  proc getServByName*(name, proto: string): Servent {.tags: [ReadIOEffect].} =
+    ## Searches the database from the beginning and finds the first entry for
+    ## which the service name specified by ``name`` matches the s_name member
+    ## and the protocol name specified by ``proto`` matches the s_proto member.
+    ##
+    ## On posix this will search through the ``/etc/services`` file.
+    when useWinVersion:
+      var s = winlean.getservbyname(name, proto)
     else:
-      raiseOSError(osLastError(), "unknown h_addrtype")
-  if result.addrtype == AF_INET:
-    result.addrList = @[]
-    var i = 0
-    while not isNil(s.h_addr_list[i]):
-      var inaddrPtr = cast[ptr InAddr](s.h_addr_list[i])
-      result.addrList.add($inet_ntoa(inaddrPtr[]))
-      inc(i)
-  else:
-    result.addrList = cstringArrayToSeq(s.h_addr_list)
-  result.length = int(s.h_length)
+      var s = posix.getservbyname(name, proto)
+    if s == nil: raiseOSError(osLastError(), "Service not found.")
+    result.name = $s.s_name
+    result.aliases = cstringArrayToSeq(s.s_aliases)
+    result.port = Port(s.s_port)
+    result.proto = $s.s_proto
+
+  proc getServByPort*(port: Port, proto: string): Servent {.tags: [ReadIOEffect].} =
+    ## Searches the database from the beginning and finds the first entry for
+    ## which the port specified by ``port`` matches the s_port member and the
+    ## protocol name specified by ``proto`` matches the s_proto member.
+    ##
+    ## On posix this will search through the ``/etc/services`` file.
+    when useWinVersion:
+      var s = winlean.getservbyport(ze(int16(port)).cint, proto)
+    else:
+      var s = posix.getservbyport(ze(int16(port)).cint, proto)
+    if s == nil: raiseOSError(osLastError(), "Service not found.")
+    result.name = $s.s_name
+    result.aliases = cstringArrayToSeq(s.s_aliases)
+    result.port = Port(s.s_port)
+    result.proto = $s.s_proto
+
+  proc getHostByAddr*(ip: string): Hostent {.tags: [ReadIOEffect].} =
+    ## This function will lookup the hostname of an IP Address.
+    var myaddr: InAddr
+    myaddr.s_addr = inet_addr(ip)
+
+    when useWinVersion:
+      var s = winlean.gethostbyaddr(addr(myaddr), sizeof(myaddr).cuint,
+                                    cint(AF_INET))
+      if s == nil: raiseOSError(osLastError())
+    else:
+      var s =
+        when defined(android4):
+          posix.gethostbyaddr(cast[cstring](addr(myaddr)), sizeof(myaddr).cint,
+                              cint(posix.AF_INET))
+        else:
+          posix.gethostbyaddr(addr(myaddr), sizeof(myaddr).SockLen,
+                              cint(posix.AF_INET))
+      if s == nil:
+        raiseOSError(osLastError(), $hstrerror(h_errno))
+
+    result.name = $s.h_name
+    result.aliases = cstringArrayToSeq(s.h_aliases)
+    when useWinVersion:
+      result.addrtype = Domain(s.h_addrtype)
+    else:
+      if s.h_addrtype == posix.AF_INET:
+        result.addrtype = AF_INET
+      elif s.h_addrtype == posix.AF_INET6:
+        result.addrtype = AF_INET6
+      else:
+        raiseOSError(osLastError(), "unknown h_addrtype")
+    if result.addrtype == AF_INET:
+      result.addrList = @[]
+      var i = 0
+      while not isNil(s.h_addr_list[i]):
+        var inaddrPtr = cast[ptr InAddr](s.h_addr_list[i])
+        result.addrList.add($inet_ntoa(inaddrPtr[]))
+        inc(i)
+    else:
+      result.addrList = cstringArrayToSeq(s.h_addr_list)
+    result.length = int(s.h_length)
 
 proc getHostByName*(name: string): Hostent {.tags: [ReadIOEffect].} =
   ## This function will lookup the IP address of a hostname.
