@@ -284,7 +284,7 @@ else:
 
   when not defined(windows):
     when defined(freertos):
-      import freertos as posix
+      import freertos/posix as posix
     else:
       import posix
 

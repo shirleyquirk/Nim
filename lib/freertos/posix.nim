@@ -99,7 +99,6 @@ proc posix_fadvise*(a1: cint, a2, a3: Off, a4: cint): cint {.
 proc posix_fallocate*(a1: cint, a2, a3: Off): cint {.
   importc, header: "<fcntl.h>".}
 
-
 when not defined(freertos_plus):
   proc mq_close*(a1: Mqd): cint {.importc, header: "<mqueue.h>".}
   proc mq_getattr*(a1: Mqd, a2: ptr MqAttr): cint {.
@@ -492,6 +491,8 @@ proc getnameinfo*(a1: ptr SockAddr, a2: SockLen,
 proc IN6_IS_ADDR_V4MAPPED*(ipv6_address: ptr In6Addr): cint =
   var bits32: ptr array[4, uint32] = cast[ptr array[4, uint32]](ipv6_address)
   return (bits32[1] == 0'u32 and bits32[2] == htonl(0x0000FFFF)).cint
+
+include oslite/nofs
 
 when defined(nimHasStyleChecks):
   {.pop.} # {.push styleChecks: off.}

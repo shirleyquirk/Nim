@@ -71,6 +71,12 @@ elif defined(posix):
 
   proc toTime(ts: Timespec): times.Time {.inline.} =
     result = initTime(ts.tv_sec.int64, ts.tv_nsec.int)
+elif defined(freertos):
+  import freertos/posix as posix
+  import times
+
+  proc toTime(ts: Timespec): times.Time {.inline.} =
+    result = initTime(ts.tv_sec.int64, ts.tv_nsec.int)
 else:
   {.error: "OS module not ported to your operating system!".}
 
@@ -1225,10 +1231,12 @@ proc getLastModificationTime*(file: string): times.Time {.rtl, extern: "nos$1", 
   ## * `getLastAccessTime proc <#getLastAccessTime,string>`_
   ## * `getCreationTime proc <#getCreationTime,string>`_
   ## * `fileNewer proc <#fileNewer,string,string>`_
-  when defined(posix):
+  when defined(posix) or defined(oslite):
     var res: Stat
     if stat(file, res) < 0'i32: raiseOSError(osLastError(), file)
     result = res.st_mtim.toTime
+  elif defined(oslite):
+    {.error: "no file".}
   else:
     var f: WIN32_FIND_DATA
     var h = findFirstFile(file, f)
@@ -1243,7 +1251,7 @@ proc getLastAccessTime*(file: string): times.Time {.rtl, extern: "nos$1", noNimS
   ## * `getLastModificationTime proc <#getLastModificationTime,string>`_
   ## * `getCreationTime proc <#getCreationTime,string>`_
   ## * `fileNewer proc <#fileNewer,string,string>`_
-  when defined(posix):
+  when defined(posix) or defined(oslite):
     var res: Stat
     if stat(file, res) < 0'i32: raiseOSError(osLastError(), file)
     result = res.st_atim.toTime
@@ -1265,7 +1273,7 @@ proc getCreationTime*(file: string): times.Time {.rtl, extern: "nos$1", noNimScr
   ## * `getLastModificationTime proc <#getLastModificationTime,string>`_
   ## * `getLastAccessTime proc <#getLastAccessTime,string>`_
   ## * `fileNewer proc <#fileNewer,string,string>`_
-  when defined(posix):
+  when defined(posix) or defined(oslite):
     var res: Stat
     if stat(file, res) < 0'i32: raiseOSError(osLastError(), file)
     result = res.st_ctim.toTime
@@ -1573,7 +1581,7 @@ proc getFilePermissions*(filename: string): set[FilePermission] {.
   ## See also:
   ## * `setFilePermissions proc <#setFilePermissions,string,set[FilePermission]>`_
   ## * `FilePermission enum <#FilePermission>`_
-  when defined(posix):
+  when defined(posix) or defined(oslite):
     var a: Stat
     if stat(filename, a) < 0'i32: raiseOSError(osLastError(), filename)
     result = {}
@@ -1626,6 +1634,8 @@ proc setFilePermissions*(filename: string, permissions: set[FilePermission]) {.
     if fpOthersExec in permissions: p = p or S_IXOTH.Mode
 
     if chmod(filename, cast[Mode](p)) != 0: raiseOSError(osLastError(), $(filename, permissions))
+  elif defined(oslite):
+    return
   else:
     when useWinUnicode:
       wrapUnary(res, getFileAttributesW, filename)
@@ -1747,6 +1757,8 @@ proc tryRemoveFile*(file: string): bool {.rtl, extern: "nos$1", tags: [WriteDirE
          setFileAttributes(f, FILE_ATTRIBUTE_NORMAL) != 0 and
          deleteFile(f) != 0:
         result = true
+  when defined(oslite):
+    raise newException(OSError, "not implemented for Lite OS'es!")
   else:
     if unlink(file) != 0'i32 and errno != ENOENT:
       result = false
@@ -1781,6 +1793,9 @@ proc tryMoveFSObject(source, dest: string): bool {.noNimScript.} =
       if moveFileExW(s, d, MOVEFILE_COPY_ALLOWED) == 0'i32: raiseOSError(osLastError(), $(source, dest))
     else:
       if moveFileExA(source, dest, MOVEFILE_COPY_ALLOWED) == 0'i32: raiseOSError(osLastError(), $(source, dest))
+    return true
+  elif defined(posix) or defined(oslite):
+    raise newException(OSError, "not implemented for Lite OS'es!")
   else:
     if c_rename(source, dest) != 0'i32:
       let err = osLastError()
@@ -1789,7 +1804,7 @@ proc tryMoveFSObject(source, dest: string): bool {.noNimScript.} =
       else:
         # see whether `strerror(errno)` is redundant with what raiseOSError already shows
         raiseOSError(err, $(source, dest, strerror(errno)))
-  return true
+    return true
 
 proc moveFile*(source, dest: string) {.rtl, extern: "nos$1",
   tags: [ReadIOEffect, WriteIOEffect], noNimScript.} =
@@ -1887,6 +1902,8 @@ template walkCommon(pattern: string, filter) =
           let errCode = getLastError()
           if errCode == ERROR_NO_MORE_FILES: break
           else: raiseOSError(errCode.OSErrorCode)
+  elif defined(oslite):
+    raise newException(OSError, "not implemented for Lite OS'es!")
   else: # here we use glob
     var
       f: Glob
@@ -2014,7 +2031,7 @@ proc getCurrentCompilerExe*(): string {.compileTime.} = discard
   ## inside a nimble program (likewise with other binaries built from
   ## compiler API).
 
-when defined(posix) and not weirdTarget:
+when (defined(posix) or defined(oslite)) and not weirdTarget:
   proc getSymlinkFileKind(path: string): PathComponent =
     # Helper function.
     var s: Stat
@@ -2063,7 +2080,7 @@ iterator walkDir*(dir: string; relative = false, checkDir = false):
     for k, v in items(staticWalkDir(dir, relative)):
       yield (k, v)
   else:
-    when weirdTarget:
+    when weirdTarget or defined(oslite):
       for k, v in items(staticWalkDir(dir, relative)):
         yield (k, v)
     elif defined(windows):
@@ -2240,7 +2257,7 @@ proc rawCreateDir(dir: string): bool {.noNimScript.} =
       result = false
     else:
       raiseOSError(osLastError(), dir)
-  elif defined(posix):
+  elif defined(posix) or defined(oslite):
     let res = mkdir(dir, 0o777)
     if res == 0'i32:
       result = true
@@ -3213,7 +3230,7 @@ proc getCurrentProcessId*(): int {.noNimScript.} =
 proc setLastModificationTime*(file: string, t: times.Time) {.noNimScript.} =
   ## Sets the `file`'s last modification time. `OSError` is raised in case of
   ## an error.
-  when defined(posix):
+  when defined(posix) or defined(oslite):
     let unixt = posix.Time(t.toUnix)
     let micro = convert(Nanoseconds, Microseconds, t.nanosecond)
     var timevals = [Timeval(tv_sec: unixt, tv_usec: micro),
@@ -3315,60 +3332,3 @@ when isMainModule:
     doAssert isValidFilename("ux.bat")
     doAssert isValidFilename("nim.nim")
     doAssert isValidFilename("foo.log")
-
-when defined(oslite):
-
-  include "system/inclrtl"
-  import std/private/since
-
-  import times
-
-  import strutils, pathnorm
-
-  const weirdTarget = defined(nimscript) or defined(js)
-
-  include "includes/oserr"
-
-  # template existsEnv
-  # template getEnv
-
-  import "includes/osseps"
-
-  import tables 
-
-  # var customEnvs: Table[string, string]
-  var customEnvs = newTable[string, string]()
-
-  proc existsEnv*(key: string): bool =
-    ## Checks whether the environment variable named `key` exists.
-    ## Returns true if it exists, false otherwise.
-    ##
-    ## See also:
-    ## * `getEnv proc <#getEnv,string,string>`_
-    ## * `putEnv proc <#putEnv,string,string>`_
-    ## * `delEnv proc <#delEnv,string>`_
-    ## * `envPairs iterator <#envPairs.i>`_
-    return customEnvs.hasKey(key)
-
-  proc getEnv*(key: string, default = ""): TaintedString =
-    ## Returns the value of the `environment variable`:idx: named `key`.
-    ##
-    ## If the variable does not exist, `""` is returned. To distinguish
-    ## whether a variable exists or it's value is just `""`, call
-    ## `existsEnv(key) proc <#existsEnv,string>`_.
-    ##
-    ## See also:
-    ## * `existsEnv proc <#existsEnv,string>`_
-    ## * `putEnv proc <#putEnv,string,string>`_
-    ## * `delEnv proc <#delEnv,string>`_
-    ## * `envPairs iterator <#envPairs.i>`_
-    return customEnvs.getOrDefault(key, default)
-
-  proc paramStr*(i: int): string =
-    ## Retrieves the ``i``'th command line parameter.
-    discard
-
-  proc paramCount*(): int =
-    ## Retrieves the number of command line parameters.
-    discard
-

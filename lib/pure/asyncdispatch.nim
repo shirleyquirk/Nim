@@ -1090,7 +1090,7 @@ when defined(windows) or defined(nimdoc):
 else:
   import selectors
   when defined(freertos):
-    from freertos import EINTR, EAGAIN, EINPROGRESS, EWOULDBLOCK, MSG_PEEK,
+    from freertos/posix import EINTR, EAGAIN, EINPROGRESS, EWOULDBLOCK, MSG_PEEK,
                       MSG_NOSIGNAL
   else:
     from posix import EINTR, EAGAIN, EINPROGRESS, EWOULDBLOCK, MSG_PEEK,
