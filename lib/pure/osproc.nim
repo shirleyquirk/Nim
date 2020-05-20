@@ -24,6 +24,8 @@ export quoteShell, quoteShellWindows, quoteShellPosix
 
 when defined(windows):
   import winlean
+elif defined(freertos):
+  {.error.}
 else:
   import posix
 

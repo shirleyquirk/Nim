@@ -77,6 +77,9 @@ when defined(js):
 elif defined(posix):
   import posix
 
+elif defined(freertos):
+  import freertos as posix
+
 elif defined(windows):
   proc QueryPerformanceCounter(res: var uint64) {.
     importc: "QueryPerformanceCounter", stdcall, dynlib: "kernel32".}

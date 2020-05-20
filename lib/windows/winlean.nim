@@ -12,6 +12,9 @@
 
 import dynlib
 
+when defined(freertos):
+  {.error: "error including freertos".}
+
 when defined(nimHasStyleChecks):
   {.push styleChecks: off.}
 

@@ -20,6 +20,11 @@ when defined(windows):
   const platformHeaders = """#include <winsock2.h>
                              #include <windows.h>"""
   const EAGAIN = WSAEWOULDBLOCK
+elif defined(freertos):
+  const platformHeaders = """#include <sys/select.h>
+                             #include <sys/time.h>
+                             #include <sys/types.h>
+                             #include <unistd.h>"""
 else:
   const platformHeaders = """#include <sys/select.h>
                              #include <sys/time.h>
@@ -170,6 +175,13 @@ when defined(windows):
     if res1 != 0 or res2 != 0:
       raiseIOSelectorsError(osLastError())
 
+elif defined(oslite):
+  proc newSelectEvent*(): SelectEvent {.error.}
+
+  proc trigger*(ev: SelectEvent) {.error.}
+
+  proc close*(ev: SelectEvent) {.error.}
+
 else:
   proc newSelectEvent*(): SelectEvent =
     var fds: array[2, cint]
@@ -313,6 +325,8 @@ proc selectInto*[T](s: Selector[T], timeout: int,
 
   if timeout != -1:
     when defined(genode):
+      tv.tv_sec = Time(timeout div 1_000)
+    when defined(oslite):
       tv.tv_sec = Time(timeout div 1_000)
     else:
       tv.tv_sec = timeout.int32 div 1_000

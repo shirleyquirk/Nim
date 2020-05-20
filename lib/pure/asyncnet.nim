@@ -95,11 +95,8 @@
 ##   runForever()
 ##
 
-include "system/inclrtl"
-
-import asyncdispatch
-import nativesockets
-import net
+import std/private/since
+import asyncdispatch, nativesockets, net
 import os
 
 export SOBool

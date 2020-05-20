@@ -283,7 +283,10 @@ else:
     setBlocking(fd.SocketHandle, false)
 
   when not defined(windows):
-    import posix
+    when defined(freertos):
+      import freertos as posix
+    else:
+      import posix
 
     template setKey(s, pident, pevents, pparam, pdata: untyped) =
       var skey = addr(s.fds[pident])
@@ -332,6 +335,8 @@ else:
     include ioselects/ioselectors_select # TODO: use the native VFS layer
   elif defined(nintendoswitch):
     include ioselects/ioselectors_select
+  elif defined(freertos):
+    include ioselects/ioselectors_select
   else:
     include ioselects/ioselectors_poll
 
@@ -340,16 +345,17 @@ proc register*[T](s: Selector[T], fd: int | SocketHandle,
   ## **Deprecated since v0.18.0:** Use ``registerHandle`` instead.
   s.registerHandle(fd, events, data)
 
-proc setEvent*(ev: SelectEvent) {.deprecated: "use trigger instead".} =
-  ## Trigger event ``ev``.
-  ##
-  ## **Deprecated since v0.18.0:** Use ``trigger`` instead.
-  ev.trigger()
+when not defined(freertos):
+  proc setEvent*(ev: SelectEvent) {.deprecated: "use trigger instead".} =
+    ## Trigger event ``ev``.
+    ##
+    ## **Deprecated since v0.18.0:** Use ``trigger`` instead.
+    ev.trigger()
 
-proc update*[T](s: Selector[T], fd: int | SocketHandle,
-                events: set[Event]) {.deprecated: "use updateHandle instead".} =
-  ## Update file/socket descriptor ``fd``, registered in selector
-  ## ``s`` with new events set ``event``.
-  ##
-  ## **Deprecated since v0.18.0:** Use ``updateHandle`` instead.
-  s.updateHandle()
+  proc update*[T](s: Selector[T], fd: int | SocketHandle,
+                  events: set[Event]) {.deprecated: "use updateHandle instead".} =
+    ## Update file/socket descriptor ``fd``, registered in selector
+    ## ``s`` with new events set ``event``.
+    ##
+    ## **Deprecated since v0.18.0:** Use ``updateHandle`` instead.
+    s.updateHandle()

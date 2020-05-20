@@ -37,6 +37,9 @@
 when defined(nimHasStyleChecks):
   {.push styleChecks: off.}
 
+when defined(freertos):
+  {.error: "General POSIX not implemented for FreeRTOS".}
+
 # TODO these constants don't seem to be fetched from a header file for unknown
 #      platforms - where do they come from and why are they here?
 when false:
