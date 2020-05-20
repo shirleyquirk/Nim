@@ -32,7 +32,7 @@ else:
     static:
       echo "Compiling nativesockets using FreeRTOS"
 
-    import freertos as posix
+    import freertos/posix as posix
   else:
     import posix
   export fcntl, F_GETFL, O_NONBLOCK, F_SETFL, EAGAIN, EWOULDBLOCK, MSG_NOSIGNAL,

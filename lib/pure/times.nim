@@ -222,7 +222,7 @@ when defined(js):
   {.pop.}
 
 elif defined(freertos):
-  import freertos as posix
+  import freertos/posix as posix
 
   type CTime = posix.Time
 

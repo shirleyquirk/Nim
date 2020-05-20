@@ -18,7 +18,8 @@ import "includes/osseps"
 
 import tables 
 
-var customEnvs: Table[string, string]
+# var customEnvs: Table[string, string]
+var customEnvs = newTable[string, string]()
 
 proc existsEnv*(key: string): bool =
   ## Checks whether the environment variable named `key` exists.
@@ -45,4 +46,11 @@ proc getEnv*(key: string, default = ""): TaintedString =
   ## * `envPairs iterator <#envPairs.i>`_
   return customEnvs.getOrDefault(key, default)
 
+proc paramStr*(i: int): string =
+  ## Retrieves the ``i``'th command line parameter.
+  discard
+
+proc paramCount*(): int =
+  ## Retrieves the number of command line parameters.
+  discard
 
