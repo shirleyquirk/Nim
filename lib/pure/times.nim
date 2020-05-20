@@ -2772,7 +2772,7 @@ proc getTimezone*(): int
   ## utc offset (including DST).
   when defined(js):
     return newDate().getTimezoneOffset() * 60
-  elif defined(freebsd) or defined(netbsd) or defined(openbsd):
+  elif defined(freebsd) or defined(netbsd) or defined(openbsd) or defined(oslite):
     # This is wrong since it will include DST offsets, but the behavior has
     # always been wrong for bsd and the proc is deprecated so lets ignore it.
     return now().utcOffset

@@ -95,7 +95,6 @@
 ##   runForever()
 ##
 
-import std/private/since
 import asyncdispatch, nativesockets, net
 import os
 

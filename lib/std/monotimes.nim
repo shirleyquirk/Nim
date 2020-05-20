@@ -78,7 +78,7 @@ elif defined(posix):
   import posix
 
 elif defined(freertos):
-  import freertos as posix
+  import freertos/posix as posix
 
 elif defined(windows):
   proc QueryPerformanceCounter(res: var uint64) {.

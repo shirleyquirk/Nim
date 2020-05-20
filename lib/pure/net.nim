@@ -67,8 +67,6 @@
 const useWinVersion = defined(Windows) or defined(nimdoc)
 const defineSsl = defined(ssl) or defined(nimdoc)
 
-import std/private/since
-
 import nativesockets, os, strutils, times, sets, options, std/monotimes
 
 when defineSsl:
@@ -1009,7 +1007,7 @@ proc close*(socket: Socket) =
 when defined(posix):
   from posix import TCP_NODELAY
 elif defined(freertos):
-  from freertos import TCP_NODELAY
+  from freertos/posix import TCP_NODELAY
 else:
   from winlean import TCP_NODELAY
 

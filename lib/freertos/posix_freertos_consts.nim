@@ -406,31 +406,6 @@ var SHUT_RD* {.importc: "SHUT_RD", header: "<sys/socket.h>".}: cint
 var SHUT_RDWR* {.importc: "SHUT_RDWR", header: "<sys/socket.h>".}: cint
 var SHUT_WR* {.importc: "SHUT_WR", header: "<sys/socket.h>".}: cint
 
-# # <sys/stat.h>
-# var S_IFBLK* {.importc: "S_IFBLK", header: "<sys/stat.h>".}: cint
-# var S_IFCHR* {.importc: "S_IFCHR", header: "<sys/stat.h>".}: cint
-# var S_IFDIR* {.importc: "S_IFDIR", header: "<sys/stat.h>".}: cint
-# var S_IFIFO* {.importc: "S_IFIFO", header: "<sys/stat.h>".}: cint
-# var S_IFLNK* {.importc: "S_IFLNK", header: "<sys/stat.h>".}: cint
-# var S_IFMT* {.importc: "S_IFMT", header: "<sys/stat.h>".}: cint
-# var S_IFREG* {.importc: "S_IFREG", header: "<sys/stat.h>".}: cint
-# var S_IFSOCK* {.importc: "S_IFSOCK", header: "<sys/stat.h>".}: cint
-# var S_IRGRP* {.importc: "S_IRGRP", header: "<sys/stat.h>".}: cint
-# var S_IROTH* {.importc: "S_IROTH", header: "<sys/stat.h>".}: cint
-# var S_IRUSR* {.importc: "S_IRUSR", header: "<sys/stat.h>".}: cint
-# var S_IRWXG* {.importc: "S_IRWXG", header: "<sys/stat.h>".}: cint
-# var S_IRWXO* {.importc: "S_IRWXO", header: "<sys/stat.h>".}: cint
-# var S_IRWXU* {.importc: "S_IRWXU", header: "<sys/stat.h>".}: cint
-# var S_ISGID* {.importc: "S_ISGID", header: "<sys/stat.h>".}: cint
-# var S_ISUID* {.importc: "S_ISUID", header: "<sys/stat.h>".}: cint
-# var S_ISVTX* {.importc: "S_ISVTX", header: "<sys/stat.h>".}: cint
-# var S_IWGRP* {.importc: "S_IWGRP", header: "<sys/stat.h>".}: cint
-# var S_IWOTH* {.importc: "S_IWOTH", header: "<sys/stat.h>".}: cint
-# var S_IWUSR* {.importc: "S_IWUSR", header: "<sys/stat.h>".}: cint
-# var S_IXGRP* {.importc: "S_IXGRP", header: "<sys/stat.h>".}: cint
-# var S_IXOTH* {.importc: "S_IXOTH", header: "<sys/stat.h>".}: cint
-# var S_IXUSR* {.importc: "S_IXUSR", header: "<sys/stat.h>".}: cint
-
 # # <sys/statvfs.h>
 # var ST_RDONLY* {.importc: "ST_RDONLY", header: "<sys/statvfs.h>".}: cint
 # var ST_NOSUID* {.importc: "ST_NOSUID", header: "<sys/statvfs.h>".}: cint
