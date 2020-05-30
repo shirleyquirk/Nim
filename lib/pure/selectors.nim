@@ -332,6 +332,8 @@ else:
     include ioselects/ioselectors_select # TODO: use the native VFS layer
   elif defined(nintendoswitch):
     include ioselects/ioselectors_select
+  elif defined(freertos) or defined(lwip):
+    include ioselects/ioselectors_select
   else:
     include ioselects/ioselectors_poll
 

@@ -700,6 +700,10 @@ when declared(stdout):
     var echoLock: SysLock
     initSysLock echoLock
 
+  const stdOutLock = not defined(windows) and not defined(android) and
+                     not defined(nintendoswitch) and not defined(freertos) and
+                     hostOS != "any"
+
   proc echoBinSafe(args: openArray[string]) {.compilerproc.} =
     when defined(androidNDK):
       var s = ""
@@ -708,7 +712,7 @@ when declared(stdout):
       android_log_print(ANDROID_LOG_VERBOSE, "nim", s)
     else:
       # flockfile deadlocks some versions of Android 5.x.x
-      when not defined(windows) and not defined(android) and not defined(nintendoswitch) and hostOS != "any":
+      when stdOutLock:
         proc flockfile(f: File) {.importc, nodecl.}
         proc funlockfile(f: File) {.importc, nodecl.}
         flockfile(stdout)
@@ -722,7 +726,7 @@ when declared(stdout):
       const linefeed = "\n"
       discard c_fwrite(linefeed.cstring, linefeed.len, 1, stdout)
       discard c_fflush(stdout)
-      when not defined(windows) and not defined(android) and not defined(nintendoswitch) and hostOS != "any":
+      when stdOutLock:
         funlockfile(stdout)
       when defined(windows) and compileOption("threads"):
         releaseSys echoLock
