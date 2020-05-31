@@ -322,7 +322,8 @@ proc getOsFileHandle*(f: File): FileHandle =
   else:
     result = c_fileno(f)
 
-when defined(nimdoc) or (defined(posix) and not defined(nimscript)) or defined(windows):
+when defined(nimdoc) or (defined(posix) and not defined(nimscript) and 
+        not defined(freertos)) or defined(windows):
   proc setInheritable*(f: FileHandle, inheritable: bool): bool =
     ## control whether a file handle can be inherited by child processes. Returns
     ## ``true`` on success. This requires the OS file handle, which can be
