@@ -269,7 +269,7 @@ when SupportIoctlInheritCtl:
 
   proc c_ioctl(fd: cint, request: cint): cint {.
     importc: "ioctl", header: "<sys/ioctl.h>", varargs.}
-elif defined(posix) and not defined(freertos) and not defined(nimscript):
+elif defined(posix) and not defined(lwip) and not defined(nimscript):
   var
     F_GETFD {.importc, header: "<fcntl.h>".}: cint
     F_SETFD {.importc, header: "<fcntl.h>".}: cint
