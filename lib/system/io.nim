@@ -269,7 +269,7 @@ when SupportIoctlInheritCtl:
 
   proc c_ioctl(fd: cint, request: cint): cint {.
     importc: "ioctl", header: "<sys/ioctl.h>", varargs.}
-elif defined(posix) and not defined(nimscript):
+elif defined(posix) and not defined(freertos) and not defined(nimscript):
   var
     F_GETFD {.importc, header: "<fcntl.h>".}: cint
     F_SETFD {.importc, header: "<fcntl.h>".}: cint
@@ -322,8 +322,7 @@ proc getOsFileHandle*(f: File): FileHandle =
   else:
     result = c_fileno(f)
 
-when defined(nimdoc) or (defined(posix) and not defined(nimscript) and 
-        not defined(freertos)) or defined(windows):
+when defined(nimdoc) or (defined(posix) and not defined(nimscript)) or defined(windows):
   proc setInheritable*(f: FileHandle, inheritable: bool): bool =
     ## control whether a file handle can be inherited by child processes. Returns
     ## ``true`` on success. This requires the OS file handle, which can be
@@ -333,6 +332,8 @@ when defined(nimdoc) or (defined(posix) and not defined(nimscript) and
     ## availability with `declared() <system.html#declared,untyped>`.
     when SupportIoctlInheritCtl:
       result = c_ioctl(f, if inheritable: FIONCLEX else: FIOCLEX) != -1
+    elif defined(freertos):
+      result = true
     elif defined(posix):
       var flags = c_fcntl(f, F_GETFD)
       if flags == -1:
