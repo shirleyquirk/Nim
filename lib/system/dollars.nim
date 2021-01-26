@@ -1,11 +1,11 @@
-import std/private/since
-
 proc `$`*(x: int): string {.magic: "IntToStr", noSideEffect.}
   ## The stringify operator for an integer argument. Returns `x`
   ## converted to a decimal string. ``$`` is Nim's general way of
   ## spelling `toString`:idx:.
 
 when defined(js):
+  import std/private/since
+
   since (1, 3):
     proc `$`*(x: uint): string =
       ## Caveat: currently implemented as $(cast[int](x)), tied to current
@@ -19,6 +19,26 @@ when defined(js):
       ## 64bit ints.
       # pending https://github.com/nim-lang/RFCs/issues/187
       $(cast[int](x))
+else:
+  proc `$`*(x: uint64): string {.noSideEffect, raises: [].} =
+    ## The stringify operator for an unsigned integer argument. Returns `x`
+    ## converted to a decimal string.
+    if x == 0:
+      result = "0"
+    else:
+      result = newString(60)
+      var i = 0
+      var n = x
+      while n != 0:
+        let nn = n div 10'u64
+        result[i] = char(n - 10'u64 * nn + ord('0'))
+        inc i
+        n = nn
+      result.setLen i
+
+      let half = i div 2
+      # Reverse
+      for t in 0 .. half-1: swap(result[t], result[i-t-1])
 
 proc `$`*(x: int64): string {.magic: "Int64ToStr", noSideEffect.}
   ## The stringify operator for an integer argument. Returns `x`

@@ -204,7 +204,7 @@ Automatic dereferencing
 =======================
 
 Automatic dereferencing is performed for the first argument of a routine call.
-This feature has to be only enabled via ``{.experimental: "implicitDeref".}``:
+This feature has to be enabled via ``{.experimental: "implicitDeref".}``:
 
 .. code-block:: nim
   {.experimental: "implicitDeref".}
@@ -465,6 +465,7 @@ The compiler ensures that every code path initializes variables which contain
 non-nilable pointers. The details of this analysis are still to be specified
 here.
 
+.. include:: manual_experimental_strictnotnil.rst
 
 Concepts
 ========
@@ -1250,7 +1251,7 @@ all the arguments, but also the matched operators in reverse polish notation:
   echo x + y * z - x
 
 This passes the expression ``x + y * z - x`` to the ``optM`` macro as
-an ``nnkArgList`` node containing::
+an ``nnkArglist`` node containing::
 
   Arglist
     Sym "x"
@@ -1703,40 +1704,18 @@ noRewrite pragma
 Term rewriting macros and templates are currently greedy and
 they will rewrite as long as there is a match.
 There was no way to ensure some rewrite happens only once,
-eg. when rewriting term to same term plus extra content.
+e.g. when rewriting term to same term plus extra content.
 
 ``noRewrite`` pragma can actually prevent further rewriting on marked code,
 e.g. with given example ``echo("ab")`` will be rewritten just once:
 
 .. code-block:: nim
-  template pwnEcho{echo(x)}(x: expr) =
+  template pwnEcho{echo(x)}(x: untyped) =
     {.noRewrite.}: echo("pwned!")
 
   echo "ab"
 
 ``noRewrite`` pragma can be useful to control term-rewriting macros recursion.
-
-
-Taint mode
-==========
-
-The Nim compiler and most parts of the standard library support
-a taint mode. Input strings are declared with the `TaintedString`:idx:
-string type declared in the ``system`` module.
-
-If the taint mode is turned on (via the ``--taintMode:on`` command line
-option) it is a distinct string type which helps to detect input
-validation errors:
-
-.. code-block:: nim
-  echo "your name: "
-  var name: TaintedString = stdin.readline
-  # it is safe here to output the name without any input validation, so
-  # we simply convert `name` to string to make the compiler happy:
-  echo "hi, ", name.string
-
-If the taint mode is turned off, ``TaintedString`` is simply an alias for
-``string``.
 
 
 Aliasing restrictions in parameter passing

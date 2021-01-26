@@ -1151,27 +1151,15 @@ proc symlinkExists*(link: string): bool {.rtl, extern: "nos$1",
     else:
       var a = getFileAttributesA(link)
     if a != -1'i32:
+      # xxx see: bug #16784 (bug9); checking `IO_REPARSE_TAG_SYMLINK`
+      # may also be needed.
       result = (a and FILE_ATTRIBUTE_REPARSE_POINT) != 0'i32
   else:
     var res: Stat
     return lstat(link, res) >= 0'i32 and S_ISLNK(res.st_mode)
 
-
-when not defined(nimscript):
-  when not defined(js): # `noNimJs` doesn't work with templates, this should improve.
-    template existsFile*(args: varargs[untyped]): untyped {.deprecated: "use fileExists".} =
-      fileExists(args)
-    template existsDir*(args: varargs[untyped]): untyped {.deprecated: "use dirExists".} =
-      dirExists(args)
-  # {.deprecated: [existsFile: fileExists].} # pending bug #14819; this would avoid above mentioned issue
-
-when not defined(windows) and not weirdTarget:
-  proc checkSymlink(path: string): bool =
-    var rawInfo: Stat
-    if lstat(path, rawInfo) < 0'i32: result = false
-    else: result = S_ISLNK(rawInfo.st_mode)
-
 const
+  maxSymlinkLen = 1024
   ExeExts* = ## Platform specific file extension for executables.
     ## On Windows ``["exe", "cmd", "bat"]``, on Posix ``[""]``.
     when defined(windows): ["exe", "cmd", "bat"] else: [""]
@@ -1212,12 +1200,12 @@ proc findExe*(exe: string, followSymlinks: bool = true;
       if fileExists(x):
         when not defined(windows):
           while followSymlinks: # doubles as if here
-            if x.checkSymlink:
-              var r = newString(256)
-              var len = readlink(x, r, 256)
+            if x.symlinkExists:
+              var r = newString(maxSymlinkLen)
+              var len = readlink(x, r, maxSymlinkLen)
               if len < 0:
                 raiseOSError(osLastError(), exe)
-              if len > 256:
+              if len > maxSymlinkLen:
                 r = newString(len+1)
                 len = readlink(x, r, len)
               setLen(r, len)
@@ -1549,40 +1537,6 @@ proc sameFile*(path1, path2: string): bool {.rtl, extern: "nos$1",
     else:
       result = a.st_dev == b.st_dev and a.st_ino == b.st_ino
 
-proc sameFileContent*(path1, path2: string): bool {.rtl, extern: "nos$1",
-  tags: [ReadIOEffect], noWeirdTarget.} =
-  ## Returns true if both pathname arguments refer to files with identical
-  ## binary content.
-  ##
-  ## See also:
-  ## * `sameFile proc <#sameFile,string,string>`_
-  const
-    bufSize = 8192 # 8K buffer
-  var
-    a, b: File
-  if not open(a, path1): return false
-  if not open(b, path2):
-    close(a)
-    return false
-  var bufA = alloc(bufSize)
-  var bufB = alloc(bufSize)
-  while true:
-    var readA = readBuffer(a, bufA, bufSize)
-    var readB = readBuffer(b, bufB, bufSize)
-    if readA != readB:
-      result = false
-      break
-    if readA == 0:
-      result = true
-      break
-    result = equalMem(bufA, bufB, readA)
-    if not result: break
-    if readA != bufSize: break # end of file
-  dealloc(bufA)
-  dealloc(bufB)
-  close(a)
-  close(b)
-
 type
   FilePermission* = enum   ## File access permission, modelled after UNIX.
     ##
@@ -1682,7 +1636,7 @@ proc setFilePermissions*(filename: string, permissions: set[FilePermission]) {.
 
 proc copyFile*(source, dest: string) {.rtl, extern: "nos$1",
   tags: [ReadIOEffect, WriteIOEffect], noWeirdTarget.} =
-  ## Copies a file from `source` to `dest`.
+  ## Copies a file from `source` to `dest`, where `dest.parentDir` must exist.
   ##
   ## If this fails, `OSError` is raised.
   ##
@@ -1737,6 +1691,12 @@ proc copyFile*(source, dest: string) {.rtl, extern: "nos$1",
     close(s)
     flushFile(d)
     close(d)
+
+proc copyFileToDir*(source, dir: string) {.noWeirdTarget, since: (1,3,7).} =
+  ## Copies a file `source` into directory `dir`, which must exist.
+  if dir.len == 0: # treating "" as "." is error prone
+    raise newException(ValueError, "dest is empty")
+  copyFile(source, dir / source.lastPathPart)
 
 when not declared(ENOENT) and not defined(Windows):
   when NoFakeVars:
@@ -2147,21 +2107,27 @@ iterator walkDir*(dir: string; relative = false, checkDir = false):
               y = path
             var k = pcFile
 
+            template kSetGeneric() =  # pure Posix component `k` resolution
+              if lstat(path, s) < 0'i32: continue  # don't yield
+              elif S_ISDIR(s.st_mode):
+                k = pcDir
+              elif S_ISLNK(s.st_mode):
+                k = getSymlinkFileKind(path)
+
             when defined(linux) or defined(macosx) or
                  defined(bsd) or defined(genode) or defined(nintendoswitch):
-              if x.d_type != DT_UNKNOWN:
-                if x.d_type == DT_DIR: k = pcDir
-                if x.d_type == DT_LNK:
-                  if dirExists(path): k = pcLinkToDir
-                  else: k = pcLinkToFile
-                yield (k, y)
-                continue
+              case x.d_type
+              of DT_DIR: k = pcDir
+              of DT_LNK:
+                if dirExists(path): k = pcLinkToDir
+                else: k = pcLinkToFile
+              of DT_UNKNOWN:
+                kSetGeneric()
+              else: # e.g. DT_REG etc
+                discard # leave it as pcFile
+            else:  # assuming that field `d_type` is not present
+              kSetGeneric()
 
-            if lstat(path, s) < 0'i32: break
-            if S_ISDIR(s.st_mode):
-              k = pcDir
-            elif S_ISLNK(s.st_mode):
-              k = getSymlinkFileKind(path)
             yield (k, y)
 
 iterator walkDirRec*(dir: string,
@@ -2555,11 +2521,11 @@ proc expandSymlink*(symlinkPath: string): string {.noWeirdTarget.} =
   when defined(windows):
     result = symlinkPath
   else:
-    result = newString(256)
-    var len = readlink(symlinkPath, result, 256)
+    result = newString(maxSymlinkLen)
+    var len = readlink(symlinkPath, result, maxSymlinkLen)
     if len < 0:
       raiseOSError(osLastError(), symlinkPath)
-    if len > 256:
+    if len > maxSymlinkLen:
       result = newString(len+1)
       len = readlink(symlinkPath, result, len)
     setLen(result, len)
@@ -2691,7 +2657,7 @@ when defined(nimdoc):
     ##   else:
     ##     # Do something else!
 
-  proc paramStr*(i: int): TaintedString {.tags: [ReadIOEffect].} =
+  proc paramStr*(i: int): string {.tags: [ReadIOEffect].} =
     ## Returns the `i`-th `command line argument`:idx: given to the application.
     ##
     ## `i` should be in the range `1..paramCount()`, the `IndexDefect`
@@ -2725,7 +2691,7 @@ when defined(nimdoc):
 
 elif defined(nimscript): discard
 elif defined(nintendoswitch) or weirdTarget:
-  proc paramStr*(i: int): TaintedString {.tags: [ReadIOEffect].} =
+  proc paramStr*(i: int): string {.tags: [ReadIOEffect].} =
     raise newException(OSError, "paramStr is not implemented on Nintendo Switch")
 
   proc paramCount*(): int {.tags: [ReadIOEffect].} =
@@ -2748,17 +2714,17 @@ elif defined(windows):
       ownParsedArgv = true
     result = ownArgv.len-1
 
-  proc paramStr*(i: int): TaintedString {.rtl, extern: "nos$1",
+  proc paramStr*(i: int): string {.rtl, extern: "nos$1",
     tags: [ReadIOEffect].} =
     # Docstring in nimdoc block.
     if not ownParsedArgv:
       ownArgv = parseCmdLine($getCommandLine())
       ownParsedArgv = true
-    if i < ownArgv.len and i >= 0: return TaintedString(ownArgv[i])
+    if i < ownArgv.len and i >= 0: return ownArgv[i]
     raise newException(IndexDefect, formatErrorIndexBound(i, ownArgv.len-1))
 
 elif defined(genode):
-  proc paramStr*(i: int): TaintedString =
+  proc paramStr*(i: int): string =
     raise newException(OSError, "paramStr is not implemented on Genode")
 
   proc paramCount*(): int =
@@ -2771,9 +2737,9 @@ elif not defined(createNimRtl) and
     cmdCount {.importc: "cmdCount".}: cint
     cmdLine {.importc: "cmdLine".}: cstringArray
 
-  proc paramStr*(i: int): TaintedString {.tags: [ReadIOEffect].} =
+  proc paramStr*(i: int): string {.tags: [ReadIOEffect].} =
     # Docstring in nimdoc block.
-    if i < cmdCount and i >= 0: return TaintedString($cmdLine[i])
+    if i < cmdCount and i >= 0: return $cmdLine[i]
     raise newException(IndexDefect, formatErrorIndexBound(i, cmdCount-1))
 
   proc paramCount*(): int {.tags: [ReadIOEffect].} =
@@ -2781,7 +2747,7 @@ elif not defined(createNimRtl) and
     result = cmdCount-1
 
 when declared(paramCount) or defined(nimdoc):
-  proc commandLineParams*(): seq[TaintedString] =
+  proc commandLineParams*(): seq[string] =
     ## Convenience proc which returns the command line parameters.
     ##
     ## This returns **only** the parameters. If you want to get the application
@@ -2810,7 +2776,7 @@ when declared(paramCount) or defined(nimdoc):
     for i in 1..paramCount():
       result.add(paramStr(i))
 else:
-  proc commandLineParams*(): seq[TaintedString] {.error:
+  proc commandLineParams*(): seq[string] {.error:
   "commandLineParams() unsupported by dynamic libraries".} =
     discard
 
@@ -2857,9 +2823,9 @@ when not weirdTarget and (defined(freebsd) or defined(dragonfly) or defined(netb
 
 when not weirdTarget and (defined(linux) or defined(solaris) or defined(bsd) or defined(aix)):
   proc getApplAux(procPath: string): string =
-    result = newString(256)
-    var len = readlink(procPath, result, 256)
-    if len > 256:
+    result = newString(maxSymlinkLen)
+    var len = readlink(procPath, result, maxSymlinkLen)
+    if len > maxSymlinkLen:
       result = newString(len+1)
       len = readlink(procPath, result, len)
     setLen(result, len)
@@ -3067,6 +3033,8 @@ type
     lastAccessTime*: times.Time       ## Time file was last accessed.
     lastWriteTime*: times.Time        ## Time file was last modified/written to.
     creationTime*: times.Time         ## Time file was created. Not supported on all systems!
+    blockSize*: int                   ## Preferred I/O block size for this object.
+                                      ## In some filesystems, this may vary from file to file.
 
 template rawToFormalFileInfo(rawInfo, path, formalInfo): untyped =
   ## Transforms the native file info structure into the one nim uses.
@@ -3081,6 +3049,7 @@ template rawToFormalFileInfo(rawInfo, path, formalInfo): untyped =
     formalInfo.lastAccessTime = fromWinTime(rdFileTime(rawInfo.ftLastAccessTime))
     formalInfo.lastWriteTime = fromWinTime(rdFileTime(rawInfo.ftLastWriteTime))
     formalInfo.creationTime = fromWinTime(rdFileTime(rawInfo.ftCreationTime))
+    formalInfo.blockSize = 8192 # xxx use windows API instead of hardcoding
 
     # Retrieve basic permissions
     if (rawInfo.dwFileAttributes and FILE_ATTRIBUTE_READONLY) != 0'i32:
@@ -3107,6 +3076,7 @@ template rawToFormalFileInfo(rawInfo, path, formalInfo): untyped =
     formalInfo.lastAccessTime = rawInfo.st_atim.toTime
     formalInfo.lastWriteTime = rawInfo.st_mtim.toTime
     formalInfo.creationTime = rawInfo.st_ctim.toTime
+    formalInfo.blockSize = rawInfo.st_blksize
 
     formalInfo.permissions = {}
     checkAndIncludeMode(S_IRUSR, fpUserRead)
@@ -3210,6 +3180,39 @@ proc getFileInfo*(path: string, followSymlink = true): FileInfo {.noWeirdTarget.
         raiseOSError(osLastError(), path)
     rawToFormalFileInfo(rawInfo, path, result)
 
+proc sameFileContent*(path1, path2: string): bool {.rtl, extern: "nos$1",
+  tags: [ReadIOEffect], noWeirdTarget.} =
+  ## Returns true if both pathname arguments refer to files with identical
+  ## binary content.
+  ##
+  ## See also:
+  ## * `sameFile proc <#sameFile,string,string>`_
+  var
+    a, b: File
+  if not open(a, path1): return false
+  if not open(b, path2):
+    close(a)
+    return false
+  let bufSize = getFileInfo(a).blockSize
+  var bufA = alloc(bufSize)
+  var bufB = alloc(bufSize)
+  while true:
+    var readA = readBuffer(a, bufA, bufSize)
+    var readB = readBuffer(b, bufB, bufSize)
+    if readA != readB:
+      result = false
+      break
+    if readA == 0:
+      result = true
+      break
+    result = equalMem(bufA, bufB, readA)
+    if not result: break
+    if readA != bufSize: break # end of file
+  dealloc(bufA)
+  dealloc(bufB)
+  close(a)
+  close(b)
+
 proc isHidden*(path: string): bool {.noWeirdTarget.} =
   ## Determines whether ``path`` is hidden or not, using `this
   ## reference <https://en.wikipedia.org/wiki/Hidden_file_and_hidden_directory>`_.
@@ -3294,3 +3297,12 @@ func isValidFilename*(filename: string, maxLen = 259.Positive): bool {.since: (1
     find(f.name, invalidFilenameChars) != -1): return false
   for invalid in invalidFilenames:
     if cmpIgnoreCase(f.name, invalid) == 0: return false
+
+# deprecated declarations
+when not defined(nimscript):
+  when not defined(js): # `noNimJs` doesn't work with templates, this should improve.
+    template existsFile*(args: varargs[untyped]): untyped {.deprecated: "use fileExists".} =
+      fileExists(args)
+    template existsDir*(args: varargs[untyped]): untyped {.deprecated: "use dirExists".} =
+      dirExists(args)
+  # {.deprecated: [existsFile: fileExists].} # pending bug #14819; this would avoid above mentioned issue

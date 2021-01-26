@@ -12,7 +12,7 @@
 ## sequences and does not depend on any other module, on Windows it uses the
 ## Windows API.
 ## Changing the style is permanent even after program termination! Use the
-## code ``system.addQuitProc(resetAttributes)`` to restore the defaults.
+## code `exitprocs.addExitProc(resetAttributes)` to restore the defaults.
 ## Similarly, if you hide the cursor, make sure to unhide it with
 ## ``showCursor`` before quitting.
 
@@ -37,7 +37,10 @@ type
 
 var gTerm {.threadvar.}: owned(PTerminal)
 
-proc newTerminal(): owned(PTerminal) {.gcsafe, raises: [].}
+when defined(windows) and defined(consoleapp):
+  proc newTerminal(): owned(PTerminal) {.gcsafe, raises: [OSError].}
+else:
+  proc newTerminal(): owned(PTerminal) {.gcsafe, raises: [].}
 
 proc getTerminal(): PTerminal {.inline.} =
   if isNil(gTerm):
@@ -689,10 +692,9 @@ template styledEchoProcessArg(f: File, color: Color) =
 template styledEchoProcessArg(f: File, cmd: TerminalCmd) =
   when cmd == resetStyle:
     resetAttributes(f)
-  when cmd == fgColor:
-    fgSetColor = true
-  when cmd == bgColor:
-    fgSetColor = false
+  elif cmd in {fgColor, bgColor}:
+    let term = getTerminal()
+    term.fgSetColor = cmd == fgColor
 
 macro styledWrite*(f: File, m: varargs[typed]): untyped =
   ## Similar to ``write``, but treating terminal style arguments specially.
@@ -769,7 +771,7 @@ proc getch*(): char =
 when defined(windows):
   from unicode import toUTF8, Rune, runeLenAt
 
-  proc readPasswordFromStdin*(prompt: string, password: var TaintedString):
+  proc readPasswordFromStdin*(prompt: string, password: var string):
                               bool {.tags: [ReadIOEffect, WriteIOEffect].} =
     ## Reads a `password` from stdin without printing it. `password` must not
     ## be ``nil``! Returns ``false`` if the end of the file has been reached,
@@ -795,7 +797,7 @@ when defined(windows):
 else:
   import termios
 
-  proc readPasswordFromStdin*(prompt: string, password: var TaintedString):
+  proc readPasswordFromStdin*(prompt: string, password: var string):
                             bool {.tags: [ReadIOEffect, WriteIOEffect].} =
     password.string.setLen(0)
     let fd = stdin.getFileHandle()
@@ -809,9 +811,9 @@ else:
     stdout.write "\n"
     discard fd.tcSetAttr(TCSADRAIN, old.addr)
 
-proc readPasswordFromStdin*(prompt = "password: "): TaintedString =
+proc readPasswordFromStdin*(prompt = "password: "): string =
   ## Reads a password from stdin without printing it.
-  result = TaintedString("")
+  result = ""
   discard readPasswordFromStdin(prompt, result)
 
 
@@ -841,7 +843,7 @@ template setBackgroundColor*(color: Color) =
 proc resetAttributes*() {.noconv.} =
   ## Resets all attributes on stdout.
   ## It is advisable to register this as a quit proc with
-  ## ``system.addQuitProc(resetAttributes)``.
+  ## `exitprocs.addExitProc(resetAttributes)`.
   resetAttributes(stdout)
 
 proc isTrueColorSupported*(): bool =
@@ -906,7 +908,7 @@ proc newTerminal(): owned(PTerminal) =
 when not defined(testing) and isMainModule:
   assert ansiStyleCode(styleBright) == "\e[1m"
   assert ansiStyleCode(styleStrikethrough) == "\e[9m"
-  #system.addQuitProc(resetAttributes)
+  # exitprocs.addExitProc(resetAttributes)
   write(stdout, "never mind")
   stdout.eraseLine()
   stdout.styledWriteLine({styleBright, styleBlink, styleUnderscore}, "styled text ")

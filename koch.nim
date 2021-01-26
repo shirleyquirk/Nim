@@ -10,12 +10,12 @@
 #
 
 const
-  NimbleStableCommit = "26167cd3b7671006c8bd38cbef8708431ddf8687" # master
-  FusionStableCommit = "319aac4d43b04113831b529f8003e82f4af6a4a5"
+  NimbleStableCommit = "8f7af860c5ce9634af880a7081c6435e1f2a5148" # master
+  FusionStableCommit = "372ee4313827ef9f2ea388840f7d6b46c2b1b014"
 
 when not defined(windows):
   const
-    Z3StableCommit = "65de3f748a6812eecd7db7c478dcd5fc54424d368b" # the version of Z3 that DrNim uses
+    Z3StableCommit = "65de3f748a6812eecd7db7c478d5fc54424d368b" # the version of Z3 that DrNim uses
 
 when defined(gcc) and defined(windows):
   when defined(x86):
@@ -63,7 +63,7 @@ Possible Commands:
   distrohelper [bindir]    helper for distro packagers
   tools                    builds Nim related tools
   toolsNoExternal          builds Nim related tools (except external tools,
-                           ie. nimble)
+                           e.g. nimble)
                            doesn't require network connectivity
   nimble                   builds the Nimble tool
   fusion                   clone fusion into the working tree
@@ -76,14 +76,14 @@ Boot options:
                            for bootstrapping
 
 Commands for core developers:
-  runCI                    runs continuous integration (CI), eg from travis
+  runCI                    runs continuous integration (CI), e.g. from travis
   docs [options]           generates the full documentation
-  csource -d:release       builds the C sources for installation
+  csource -d:danger        builds the C sources for installation
   pdf                      builds the PDF documentation
   zip                      builds the installation zip package
   xz                       builds the installation tar.xz package
   testinstall              test tar.xz package; Unix only!
-  installdeps [options]    installs external dependency (eg tinyc) to dist/
+  installdeps [options]    installs external dependency (e.g. tinyc) to dist/
   tests [options]          run the testsuite (run a subset of tests by
                            specifying a category, e.g. `tests cat async`)
   temp options             creates a temporary compiler for testing
@@ -93,7 +93,7 @@ Web options:
                            build the official docs, use UA-48159761-1
 """
 
-let kochExe* = when isMainModule: os.getAppFilename() # always correct when koch is main program, even if `koch` exe renamed eg: `nim c -o:koch_debug koch.nim`
+let kochExe* = when isMainModule: os.getAppFilename() # always correct when koch is main program, even if `koch` exe renamed e.g.: `nim c -o:koch_debug koch.nim`
                else: getAppDir() / "koch".exe # works for winrelease
 
 proc kochExec*(cmd: string) =
@@ -156,7 +156,13 @@ proc bundleNimsuggest(args: string) =
                  options = "-d:release -d:danger " & args)
 
 proc buildVccTool(args: string) =
-  nimCompileFold("Compile Vcc", "tools/vccexe/vccexe.nim ", options = args)
+  let input = "tools/vccexe/vccexe.nim"
+  if contains(args, "--cc:vcc"):
+    nimCompileFold("Compile Vcc", input, "build", options = args)
+    let fileName = input.splitFile.name
+    moveFile(exe("build" / fileName), exe("bin" / fileName))
+  else:
+    nimCompileFold("Compile Vcc", input, options = args)
 
 proc bundleNimpretty(args: string) =
   nimCompileFold("Compile nimpretty", "nimpretty/nimpretty.nim",
@@ -168,7 +174,6 @@ proc bundleWinTools(args: string) =
   buildVccTool(args)
   nimCompile("tools/nimgrab.nim", options = "-d:ssl " & args)
   nimCompile("tools/nimgrep.nim", options = args)
-  bundleC2nim(args)
   nimCompile("testament/testament.nim", options = args)
   when false:
     # not yet a tool worth including
@@ -417,7 +422,7 @@ proc winRelease*() =
                   "web/upload/download/docs-$1.zip" % VersionAsString
   when true:
     inFold "winrelease csource":
-      csource("-d:release")
+      csource("-d:danger")
   when sizeof(pointer) == 4:
     winReleaseArch "32"
   when sizeof(pointer) == 8:
@@ -555,6 +560,7 @@ proc runCI(cmd: string) =
         execFold("test with -d:nimHasLibFFI", "$1 $2 -r testament/testament --nim:$1 r tests/misc/trunner.nim -d:nimTrunnerFfi" % [nimFFI, backend])
 
     execFold("Run nimdoc tests", "nim c -r nimdoc/tester")
+    execFold("Run rst2html tests", "nim c -r nimdoc/rsttester")
     execFold("Run nimpretty tests", "nim c -r nimpretty/tester.nim")
     when defined(posix):
       execFold("Run nimsuggest tests", "nim c -r nimsuggest/tester")
@@ -562,7 +568,7 @@ proc runCI(cmd: string) =
 proc pushCsources() =
   if not dirExists("../csources/.git"):
     quit "[Error] no csources git repository found"
-  csource("-d:release")
+  csource("-d:danger")
   let cwd = getCurrentDir()
   try:
     copyDir("build/c_code", "../csources/c_code")
@@ -583,7 +589,7 @@ proc pushCsources() =
     setCurrentDir(cwd)
 
 proc testUnixInstall(cmdLineRest: string) =
-  csource("-d:release " & cmdLineRest)
+  csource("-d:danger" & cmdLineRest)
   xz(false, cmdLineRest)
   let oldCurrentDir = getCurrentDir()
   try:

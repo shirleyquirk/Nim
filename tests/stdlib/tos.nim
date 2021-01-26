@@ -36,6 +36,25 @@ block fileOperations:
   createDir(dname)
   doAssert dirExists(dname)
 
+  block: # copyFile, copyFileToDir
+    doAssertRaises(OSError): copyFile(dname/"nonexistant.txt", dname/"nonexistant.txt")
+    let fname = "D20201009T112235"
+    let fname2 = "D20201009T112235.2"
+    writeFile(dname/fname, "foo")
+    let sub = "sub"
+    doAssertRaises(OSError): copyFile(dname/fname, dname/sub/fname2)
+    doAssertRaises(OSError): copyFileToDir(dname/fname, dname/sub)
+    doAssertRaises(ValueError): copyFileToDir(dname/fname, "")
+    copyFile(dname/fname, dname/fname2)
+    doAssert fileExists(dname/fname2)
+    createDir(dname/sub)
+    copyFileToDir(dname/fname, dname/sub)
+    doAssert fileExists(dname/sub/fname)
+    removeDir(dname/sub)
+    doAssert not dirExists(dname/sub)
+    removeFile(dname/fname)
+    removeFile(dname/fname2)
+
   # Test creating files and dirs
   for dir in dirs:
     createDir(dname/dir)
@@ -449,19 +468,19 @@ block isRelativeTo:
   doAssert not isRelativeTo("/foo2", "/foo")
 
 block: # quoteShellWindows
-  assert quoteShellWindows("aaa") == "aaa"
-  assert quoteShellWindows("aaa\"") == "aaa\\\""
-  assert quoteShellWindows("") == "\"\""
+  doAssert quoteShellWindows("aaa") == "aaa"
+  doAssert quoteShellWindows("aaa\"") == "aaa\\\""
+  doAssert quoteShellWindows("") == "\"\""
 
 block: # quoteShellWindows
-  assert quoteShellPosix("aaa") == "aaa"
-  assert quoteShellPosix("aaa a") == "'aaa a'"
-  assert quoteShellPosix("") == "''"
-  assert quoteShellPosix("a'a") == "'a'\"'\"'a'"
+  doAssert quoteShellPosix("aaa") == "aaa"
+  doAssert quoteShellPosix("aaa a") == "'aaa a'"
+  doAssert quoteShellPosix("") == "''"
+  doAssert quoteShellPosix("a'a") == "'a'\"'\"'a'"
 
 block: # quoteShell
   when defined(posix):
-    assert quoteShell("") == "''"
+    doAssert quoteShell("") == "''"
 
 block: # normalizePathEnd
   # handle edge cases correctly: shouldn't affect whether path is

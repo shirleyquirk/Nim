@@ -21,7 +21,7 @@
 ##
 ## In order to use the SSL procedures defined in this module, you will need to
 ## compile your application with the ``-d:ssl`` flag. See the
-## `newContext<net.html#newContext%2Cstring%2Cstring%2Cstring%2Cstring%2Cstring>`_
+## `newContext<net.html#newContext%2Cstring%2Cstring%2Cstring%2Cstring>`_
 ## procedure for additional details.
 ##
 ## Examples
@@ -551,7 +551,7 @@ when defineSsl:
 
   proc newContext*(protVersion = protSSLv23, verifyMode = CVerifyPeer,
                    certFile = "", keyFile = "", cipherList = CiphersIntermediate,
-                   caDir = "", caFile = ""): SSLContext =
+                   caDir = "", caFile = ""): SslContext =
     ## Creates an SSL context.
     ##
     ## Protocol version specifies the protocol to use. SSLv2, SSLv3, TLSv1
@@ -644,7 +644,7 @@ when defineSsl:
           if not found:
             raise newException(IOError, "No SSL/TLS CA certificates found.")
 
-    result = SSLContext(context: newCTX, referencedData: initHashSet[int](),
+    result = SslContext(context: newCTX, referencedData: initHashSet[int](),
       extraInternal: new(SslContextExtraInternal))
 
   proc getExtraInternal(ctx: SslContext): SslContextExtraInternal =
@@ -750,7 +750,7 @@ when defineSsl:
     ## Wildcards match only in the left-most label.
     ## When name starts with a dot it will be matched by a certificate valid for any subdomain
     when not defined(nimDisableCertificateValidation) and not defined(windows):
-      assert socket.isSSL
+      assert socket.isSsl
       let certificate = socket.sslHandle.SSL_get_peer_certificate()
       if certificate.isNil:
         raiseSSLError("No SSL certificate found.")
@@ -763,7 +763,7 @@ when defineSsl:
       if match != 1:
         raiseSSLError("SSL Certificate check failed.")
 
-  proc wrapConnectedSocket*(ctx: SSLContext, socket: Socket,
+  proc wrapConnectedSocket*(ctx: SslContext, socket: Socket,
                             handshake: SslHandshakeType,
                             hostname: string = "") =
     ## Wraps a connected socket in an SSL context. This function effectively
@@ -840,7 +840,7 @@ when defineSsl:
     if sidCtx.len > 32:
       raiseSSLError("sessionIdContext must be shorter than 32 characters")
     SSL_CTX_set_session_id_context(ctx.context, sidCtx, sidCtx.len)
-  
+
 proc getSocketError*(socket: Socket): OSErrorCode =
   ## Checks ``osLastError`` for a valid error. If it has been reset it uses
   ## the last error stored in the socket object.
@@ -1490,7 +1490,7 @@ proc peekChar(socket: Socket, c: var char): int {.tags: [ReadIOEffect].} =
         return
     result = recv(socket.fd, addr(c), 1, MSG_PEEK)
 
-proc readLine*(socket: Socket, line: var TaintedString, timeout = -1,
+proc readLine*(socket: Socket, line: var string, timeout = -1,
                flags = {SocketFlag.SafeDisconn}, maxLength = MaxLineLength) {.
   tags: [ReadIOEffect, TimeEffect].} =
   ## Reads a line of data from ``socket``.
@@ -1548,7 +1548,7 @@ proc readLine*(socket: Socket, line: var TaintedString, timeout = -1,
 
 proc recvLine*(socket: Socket, timeout = -1,
                flags = {SocketFlag.SafeDisconn},
-               maxLength = MaxLineLength): TaintedString =
+               maxLength = MaxLineLength): string =
   ## Reads a line of data from ``socket``.
   ##
   ## If a full line is read ``\r\L`` is not
@@ -1566,7 +1566,7 @@ proc recvLine*(socket: Socket, timeout = -1,
   ## that can be read. The result is truncated after that.
   ##
   ## **Warning**: Only the ``SafeDisconn`` flag is currently supported.
-  result = "".TaintedString
+  result = ""
   readLine(socket, result, timeout, flags, maxLength)
 
 proc recvFrom*(socket: Socket, data: var string, length: int,
@@ -1827,6 +1827,10 @@ proc `$`*(address: IpAddress): string =
                 result.add(chr(uint16(ord('a'))+val-0xA))
               afterLeadingZeros = true
             mask = mask shr 4
+
+          if not afterLeadingZeros:
+            result.add '0'
+
           printedLastGroup = true
 
 proc dial*(address: string, port: Port,
@@ -2005,5 +2009,8 @@ proc getPrimaryIPAddr*(dest = parseIpAddress("8.8.8.8")): IpAddress =
       newSocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
     else:
       newSocket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP)
-  socket.connect($dest, 80.Port)
-  socket.getLocalAddr()[0].parseIpAddress()
+  try:
+    socket.connect($dest, 80.Port)
+    result = socket.getLocalAddr()[0].parseIpAddress()
+  finally:
+    socket.close()

@@ -191,7 +191,7 @@ template checkOsError =
 template log(msg: string, body: untyped) =
   if mode in {ScriptMode.Verbose, ScriptMode.Whatif}:
     echo "[NimScript] ", msg
-  if mode != ScriptMode.WhatIf:
+  if mode != ScriptMode.Whatif:
     body
 
 proc listDirs*(dir: string): seq[string] =
@@ -360,21 +360,21 @@ proc cppDefine*(define: string) =
   ## needs to be mangled.
   builtin
 
-proc stdinReadLine(): TaintedString {.
+proc stdinReadLine(): string {.
   tags: [ReadIOEffect], raises: [IOError].} =
   builtin
 
-proc stdinReadAll(): TaintedString {.
+proc stdinReadAll(): string {.
   tags: [ReadIOEffect], raises: [IOError].} =
   builtin
 
-proc readLineFromStdin*(): TaintedString {.raises: [IOError].} =
+proc readLineFromStdin*(): string {.raises: [IOError].} =
   ## Reads a line of data from stdin - blocks until \n or EOF which happens when stdin is closed
   log "readLineFromStdin":
     result = stdinReadLine()
     checkError(EOFError)
 
-proc readAllFromStdin*(): TaintedString {.raises: [IOError].} =
+proc readAllFromStdin*(): string {.raises: [IOError].} =
   ## Reads all data from stdin - blocks until EOF which happens when stdin is closed
   log "readAllFromStdin":
     result = stdinReadAll()

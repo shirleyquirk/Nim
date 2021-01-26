@@ -26,6 +26,7 @@ new line after - @['a']
 finalizer
 aaaaa
 hello
+ok
 closed
 destroying variable: 20
 destroying variable: 10
@@ -134,8 +135,8 @@ let
   n = @["c", "b"]
   q = @[("c", "2"), ("b", "1")]
 
-assert n.sortedByIt(it) == @["b", "c"], "fine"
-assert q.sortedByIt(it[0]) == @[("b", "1"), ("c", "2")], "fails under arc"
+doAssert n.sortedByIt(it) == @["b", "c"], "fine"
+doAssert q.sortedByIt(it[0]) == @[("b", "1"), ("c", "2")], "fails under arc"
 
 
 #------------------------------------------------------------------------------
@@ -378,3 +379,14 @@ proc text_parser(xml: var XmlParser) =
 
 text_parser(xml)
 text_parser(xml2)
+
+# bug #15599
+type
+  PixelBuffer = ref object
+
+proc newPixelBuffer(): PixelBuffer =
+  new(result) do (buffer: PixelBuffer):
+    echo "ok"
+
+discard newPixelBuffer()
+
